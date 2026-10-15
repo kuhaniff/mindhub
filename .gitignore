@@ -2,6 +2,26 @@
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.token
+*.secret
+credentials.json
+secrets.json
+
+# Local gateway working copy and runtime logs
+gateway_work/
+*.log
+*.tmp
+*.swp
+
+# Database dumps and backups
+*.sql.gz
+*.dump
+*.bak
+*.backup
 
 # Python bytecode and caches
 __pycache__/
