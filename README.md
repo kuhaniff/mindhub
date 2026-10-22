@@ -13,6 +13,7 @@ Project-centric AI Coworker memory state engine dan MCP Streamable HTTP adapter.
 - **FastMCP Tool Registrar**: Membolehkan server gateway mendaftar tool `get_project_state`, `update_project_state`, dan `get_project_state_history` secara bersih tanpa *side effects* semasa import.
 - **Transactional MySQL Persistence**: Backend MySQL 8.4 dengan kawalan konkurensi selamat (`SELECT ... FOR UPDATE`), pengurusan zon masa UTC, dan pengasingan credential runtime.
 - **Idempotent Migration Runner**: Utiliti migrasi automatik untuk melancarkan skema `sql/project_state.sql` ke database sasaran secara selamat.
+- **GitHub Wiki to MCP Sync**: Penyegerakan sehala terkawal untuk memuat naik dokumentasi GitHub Wiki ke memori AI dengan sokongan allowlist, chunking, sanitasi rahsia, dan pengesanan perubahan berasaskan manifest.
 - **Privasi & Keselamatan Tinggi**: Pemadanan dan penapisan automatik (`[REDACTED]`) bagi API Key dalam mesej ralat MCP.
 
 ---
@@ -130,6 +131,23 @@ Atau melalui baris arahan (menggunakan pembolehubah persekitaran `MYSQL_*`):
 ```bash
 python -m mindhub.migrations
 ```
+
+### 4. GitHub Wiki to MCP Memory Sync
+
+Muat naik dokumentasi Wiki ke memori gateway:
+
+```bash
+# Simulasi (dry-run)
+python -m mindhub.wiki_sync --wiki-dir ./wiki --dry-run
+
+# Segerakkan dengan allowlist halaman terpilih
+python -m mindhub.wiki_sync \
+  --wiki-dir ./wiki \
+  --allowlist "Home.md,Architecture.md" \
+  --api-key "$MINDHUB_API_KEY"
+```
+
+Lihat maklumat lanjut dalam [docs/wiki-sync.md](docs/wiki-sync.md).
 
 ---
 

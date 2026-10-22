@@ -25,6 +25,12 @@ from .project_state import (
     get_project_state_history,
     update_project_state,
 )
+from .wiki_sync import (
+    WikiPage,
+    WikiSync,
+    WikiSyncConfig,
+    WikiSyncResult,
+)
 
 __all__ = [
     "InMemoryProjectStatePersistence",
@@ -39,6 +45,10 @@ __all__ = [
     "ProjectStateSnapshot",
     "ProjectStateStore",
     "StreamableHTTPMCPClient",
+    "WikiPage",
+    "WikiSync",
+    "WikiSyncConfig",
+    "WikiSyncResult",
     "apply_migrations",
     "extract_tool_payload",
     "get_migration_sql",
