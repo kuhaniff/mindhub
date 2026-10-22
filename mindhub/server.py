@@ -14,12 +14,18 @@ from fastapi import FastAPI, Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 try:
-    from mcp.server.fastmcp import FastMCP
-except ImportError as _mcp_err:  # pragma: no cover
-    raise ImportError(
-        "mcp package is required for the server module. "
-        "Install it with: pip install 'mcp>=2.3.0'"
-    ) from _mcp_err
+    from mcp.server import MCPServer as FastMCP
+except ImportError:
+    try:
+        from mcp.server.fastmcp import FastMCP
+    except ImportError:
+        try:
+            from fastmcp import FastMCP
+        except ImportError as _mcp_err:  # pragma: no cover
+            raise ImportError(
+                "mcp package is required for the server module. "
+                "Install it with: pip install 'mcp>=1.30.0'"
+            ) from _mcp_err
 
 from .memory import (
     MemoryPersistenceError,
@@ -63,7 +69,7 @@ def _get_state_backend() -> ProjectStatePersistence:
 
 
 # ---------------------------------------------------------------------------
-# FastMCP instance and tool registrations
+# FastMCP / MCPServer instance and tool registrations
 # ---------------------------------------------------------------------------
 
 mcp = FastMCP("mindhub")
@@ -219,8 +225,8 @@ def create_app(
             mcp_asgi = mcp.get_asgi_app()
         except AttributeError as exc:  # pragma: no cover
             raise RuntimeError(
-                "FastMCP does not expose a compatible ASGI app method. "
-                "Upgrade to mcp>=2.3.0."
+                "FastMCP / MCPServer does not expose a compatible ASGI app method. "
+                "Ensure a supported mcp package version is installed."
             ) from exc
 
     app.mount("/mcp", mcp_asgi)
