@@ -21,7 +21,11 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-dependencies = []
+dependencies = [
+    "mcp>=2.3.0",
+    "fastapi>=0.100",
+    "uvicorn>=0.20",
+]
 
 [project.optional-dependencies]
 mysql = [
@@ -30,6 +34,9 @@ mysql = [
 dev = [
     "pytest",
 ]
+
+[project.scripts]
+mindhub-server = "mindhub.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

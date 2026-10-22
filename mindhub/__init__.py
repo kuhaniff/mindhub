@@ -1,5 +1,12 @@
 """mindhub local MCP adapter package."""
 
+from .memory import (
+    Memory,
+    MemoryPersistenceError,
+    MemoryRecord,
+    remember_memory,
+    search_memories,
+)
 from .mcp_adapter import (
     MCPAuthenticationError,
     MCPError,
@@ -38,6 +45,9 @@ __all__ = [
     "MCPError",
     "MCPToolError",
     "MCPTransportError",
+    "Memory",
+    "MemoryPersistenceError",
+    "MemoryRecord",
     "ProjectState",
     "ProjectStateNotFoundError",
     "ProjectStatePersistence",
@@ -54,6 +64,8 @@ __all__ = [
     "get_migration_sql",
     "get_project_state",
     "get_project_state_history",
+    "remember_memory",
     "run_migration_from_env",
+    "search_memories",
     "update_project_state",
 ]
