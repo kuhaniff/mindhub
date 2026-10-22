@@ -40,6 +40,34 @@ class MigrationTests(unittest.TestCase):
         mock_conn.rollback.assert_called_once()
         mock_cursor.close.assert_called_once()
 
+    def test_apply_migrations_ignores_comments_with_semicolons(self):
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        sql = "-- note; do not execute this;\nCREATE TABLE t1 (id INT);\n-- another; comment;\nCREATE TABLE t2 (id INT);"
+        executed = apply_migrations(mock_conn, sql=sql)
+
+        self.assertEqual(len(executed), 2)
+        self.assertEqual(executed, ["CREATE TABLE t1 (id INT)", "CREATE TABLE t2 (id INT)"])
+        self.assertEqual(mock_cursor.execute.call_count, 2)
+
+    def test_run_migration_from_env_uses_connect(self):
+        from unittest.mock import patch
+        with patch("mindhub.mysql_project_state.MySQLProjectStatePersistence.from_env") as mock_from_env:
+            mock_backend = MagicMock()
+            mock_conn = MagicMock()
+            mock_cursor = MagicMock()
+            mock_conn.cursor.return_value = mock_cursor
+            mock_backend.connect.return_value = mock_conn
+            mock_from_env.return_value = mock_backend
+
+            from mindhub.migrations import run_migration_from_env
+            executed = run_migration_from_env({})
+            mock_backend.connect.assert_called_once()
+            mock_conn.close.assert_called_once()
+            self.assertTrue(len(executed) > 0)
+
 
 if __name__ == "__main__":
     unittest.main()

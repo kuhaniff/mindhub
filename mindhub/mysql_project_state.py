@@ -160,6 +160,10 @@ class MySQLProjectStatePersistence(ProjectStatePersistence):
                 cursor.close()
             connection.close()
 
+    def connect(self) -> object:
+        """Create and return a new database connection from the configured factory."""
+        return self._connection_factory()
+
     @staticmethod
     def _snapshot_columns() -> str:
         return (

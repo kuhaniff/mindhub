@@ -44,6 +44,19 @@ class DisposableConfigTests(unittest.TestCase):
             })
 
 
+class MySQLProjectStatePersistenceUnitTests(unittest.TestCase):
+    def test_connect_invokes_connection_factory(self):
+        from unittest.mock import MagicMock
+        from mindhub.mysql_project_state import MySQLProjectStatePersistence
+
+        mock_factory = MagicMock()
+        persistence = MySQLProjectStatePersistence(connection_factory=mock_factory)
+        conn = persistence.connect()
+
+        mock_factory.assert_called_once()
+        self.assertEqual(conn, mock_factory.return_value)
+
+
 class MySQLProjectStateIntegrationTests(unittest.TestCase):
     """Runs only against an explicitly marked disposable MySQL instance."""
 
