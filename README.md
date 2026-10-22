@@ -1,77 +1,161 @@
 # mindhub
 
-Project-centric AI Coworker memory state engine dan MCP Streamable HTTP adapter.
+Project-centric AI Coworker memory state engine, standalone MCP Streamable HTTP server, dan MCP client adapter.
 
-`mindhub` direka khusus untuk memperluaskan fungsi **AI Memory Gateway** pada `node01` (Debian 13, Intel Core i3, 7.6GB RAM) supaya bertukar daripada simpanan fakta pasif (`remember` / `search_memory`) kepada platform rakan sekerja AI yang mengekalkan kesinambungan projek (**Project Continuity**).
+`mindhub` menyediakan platform rakan sekerja AI yang mengekalkan kesinambungan projek (**Project Continuity**) serta ingatan fakta aktif (**Active Memory**) merentas ejen seperti **Hermes Agent**, **Antigravity**, dan ejen luaran/cloud.
+
+Ia boleh dijalankan sebagai:
+1. **Pelayan MCP Mandiri (Standalone MCP Server)**: FastMCP + FastAPI berasaskan SQLite (atau MySQL) dengan sokongan auth `X-API-Key` dan endpoint `/health`.
+2. **Modul Adapter / Client**: Integrasi pustaka Python standard ringan tanpa kebergantungan luar untuk berhubung dengan gateway atau pelayan MCP lain.
 
 ---
 
 ## 🎯 Ciri-ciri Utama
 
-- **Project State Engine**: Menyimpan snapshot keadaan projek yang tidak boleh diubah (*immutable snapshots*) dengan nombor jujukan monotonik (`sequence`) dan pointer keadaan semasa (`project_state_current`).
-- **Standard MCP Streamable HTTP Client**: Client ringan berasaskan Python standard library (`urllib`, `json`, `dataclasses`, `threading`) tanpa kebergantungan luar. Menyokong JSON-RPC 2.0 dan *Server-Sent Events* (`text/event-stream`).
-- **FastMCP Tool Registrar**: Membolehkan server gateway mendaftar tool `get_project_state`, `update_project_state`, dan `get_project_state_history` secara bersih tanpa *side effects* semasa import.
-- **Transactional MySQL Persistence**: Backend MySQL 8.4 dengan kawalan konkurensi selamat (`SELECT ... FOR UPDATE`), pengurusan zon masa UTC, dan pengasingan credential runtime.
-- **Idempotent Migration Runner**: Utiliti migrasi automatik untuk melancarkan skema `sql/project_state.sql` ke database sasaran secara selamat.
-- **GitHub Wiki to MCP Sync**: Penyegerakan sehala terkawal untuk memuat naik dokumentasi GitHub Wiki ke memori AI dengan sokongan allowlist, chunking, sanitasi rahsia, dan pengesanan perubahan berasaskan manifest.
-- **Privasi & Keselamatan Tinggi**: Pemadanan dan penapisan automatik (`[REDACTED]`) bagi API Key dalam mesej ralat MCP.
+- **Standalone FastMCP + FastAPI Server**: Pelayan sedia-guna yang mendedahkan 5 alatan MCP penting di laluan `/mcp` menggunakan protokol *Streamable HTTP*.
+- **5 Alatan MCP Bersepadu**:
+  - `remember`: Simpan memori baharu (kandungan, jenis memori, sumber, project ID).
+  - `search_memory`: Carian teks memori aktif & belum tamat tempoh.
+  - `get_project_state`: Dapatkan snapshot keadaan semasa projek.
+  - `update_project_state`: Tambah snapshot jujukan projek baharu (goal, status, progress, decisions, blockers).
+  - `get_project_state_history`: Dapatkan keseluruhan sejarah snapshot mengikut turutan.
+- **SQLite Persistence (Default)**: Backend thread-safe terbina dalam Python (`sqlite3`) dengan migrasi skema automatik dan mod WAL — tiada pemasangan server database luar diperlukan.
+- **MySQL Persistence (Pilihan)**: Backend transaksi MySQL 8.4 dengan kawalan konkurensi selamat (`SELECT ... FOR UPDATE`) untuk persekitaran berskala besar.
+- **Kawalan Keselamatan & Auth**: Middleware `X-API-Key` berasaskan pembolehubah `MINDHUB_API_KEYS` (kunci tidak sekali-kali dicatat dalam log), dan endpoint `/health` tanpa auth untuk healthcheck.
+- **Standard MCP Streamable HTTP Client**: Klien ringan berasaskan Python standard library (`urllib`, `json`, `dataclasses`, `threading`) tanpa kebergantungan pihak ketiga.
+- **GitHub Wiki to MCP Sync**: Penyegerakan sehala terkawal untuk memuat naik dokumentasi GitHub Wiki ke memori AI dengan sokongan allowlist, chunking, dan sanitasi rahsia.
 
 ---
 
 ## 🏗️ Seni Bina
 
 ```text
-                  +-----------------------------------+
-                  |     Hermes Agent (Node01)         |
-                  +-----------------------------------+
-                                    |
-                                    | Streamable HTTP (MCP)
-                                    v
-+-------------------------------------------------------------------------+
-| AI Memory Gateway (FastAPI / FastMCP)                                   |
-|                                                                         |
-|  Legacy Tools:            Project State Tools:                          |
-|  - search_memory          - get_project_state                           |
-|  - remember               - update_project_state                        |
-|                           - get_project_state_history                   |
-+-------------------------------------------------------------------------+
-                                    |
-                                    v
-+-------------------------------------------------------------------------+
-| MySQL 8.4 (Named volume / apps-network)                                 |
-|                                                                         |
-|  - memories (raw memories)                                              |
-|  - project_state_snapshots (immutable sequence history)                 |
-|  - project_state_current (active snapshot pointer)                      |
-+-------------------------------------------------------------------------+
+  +----------------------+  +----------------------+  +----------------------+
+  | Hermes Agent         |  | Antigravity (IDE)    |  | Cloud Agents / CLI   |
+  +----------------------+  +----------------------+  +----------------------+
+             |                         |                         |
+             +------------+            |            +------------+
+                          |            |            |
+                          v            v            v
+           +-------------------------------------------------------+
+           |               Cloudflare Tunnel / LAN                 |
+           +-------------------------------------------------------+
+                                       |
+                                       | Streamable HTTP (X-API-Key)
+                                       v
++----------------------------------------------------------------------------------+
+| Standalone Mindhub Server (FastAPI + FastMCP :8088)                              |
+|                                                                                  |
+|  Endpoints:                                                                      |
+|  - GET /health                                                                   |
+|  - POST /mcp (Streamable HTTP MCP)                                               |
+|                                                                                  |
+|  Exposed Tools:                                                                  |
+|  - remember                       - get_project_state                            |
+|  - search_memory                  - update_project_state                         |
+|                                   - get_project_state_history                    |
++----------------------------------------------------------------------------------+
+                                       |
+                     +-----------------+-----------------+
+                     |                                   |
+                     v (Default)                         v (Optional)
++------------------------------------------+  +------------------------------------+
+| SQLite Database (mindhub.db)             |  | MySQL 8.4 Database                 |
+| - memories                               |  | - memories                         |
+| - project_state_snapshots                |  | - project_state_snapshots          |
+| - project_state_current                  |  | - project_state_current            |
++------------------------------------------+  +------------------------------------+
 ```
 
 ---
 
 ## 📦 Pemasangan
 
-### Mod Asas (Client sahaja - tiada dependency luar)
+### Mod Pelayan Mandiri (Standalone Server - SQLite Default)
 ```bash
 pip install -e .
 ```
 
-### Mod Penuh (Bersama MySQL persistence)
+### Mod Penuh bersama Sokongan MySQL
 ```bash
 pip install -e .[mysql]
 ```
 
 ---
 
-## 🚀 Penggunaan Pantas
+## 🚀 Menjalankan Pelayan Mandiri (Standalone Server)
 
-### 1. Client MCP (Hermes Agent / Klien Luar)
+### 1. Tetapkan Pembolehubah Persekitaran
+
+```bash
+# Kunci API yang dibenarkan (pisahkan dengan koma untuk berbilang ejen)
+export MINDHUB_API_KEYS="hermes-secret-key,antigravity-secret-key"
+
+# (Pilihan) Lokasi fail pangkalan data SQLite (default: mindhub.db)
+export MINDHUB_DB_PATH="/path/to/mindhub.db"
+```
+
+Pada Windows PowerShell:
+```powershell
+$env:MINDHUB_API_KEYS="hermes-secret-key,antigravity-secret-key"
+$env:MINDHUB_DB_PATH="mindhub.db"
+```
+
+### 2. Mulakan Pelayan
+
+Melalui modul:
+```bash
+python -m mindhub
+```
+
+Atau melalui perintah entry point:
+```bash
+mindhub-server
+```
+
+Pelayan akan mula beroperasi pada `http://0.0.0.0:8088`.
+- Endpoint kesihatan: `http://127.0.0.1:8088/health`
+- Endpoint MCP: `http://127.0.0.1:8088/mcp` (memerlukan header `X-API-Key`)
+
+---
+
+## 💡 Konfigurasi Client MCP (Contoh)
+
+### Antigravity (`mcp_config.json`)
+```json
+{
+  "mcpServers": {
+    "mindhub": {
+      "url": "http://127.0.0.1:8088/mcp",
+      "headers": {
+        "X-API-Key": "antigravity-secret-key"
+      }
+    }
+  }
+}
+```
+
+### Hermes Agent (`config.yaml`)
+```yaml
+mcp_servers:
+  mindhub:
+    url: "http://127.0.0.1:8088/mcp"
+    headers:
+      X-API-Key: "hermes-secret-key"
+```
+
+---
+
+## 🐍 Penggunaan Pustaka Python (Client & Utility)
+
+### 1. Client MCP (Hermes Agent / Skrip Luar)
 
 ```python
 from mindhub import StreamableHTTPMCPClient
 
 client = StreamableHTTPMCPClient(
-    "http://127.0.0.1:8087/mcp",
-    api_key="your-runtime-api-key",
+    "http://127.0.0.1:8088/mcp",
+    api_key="hermes-secret-key",
 )
 
 # Handshake & discover tools
@@ -82,12 +166,12 @@ tools = client.list_tools()
 snapshot = client.update_project_state(
     project_id=1,
     state={
-        "current_goal": "Integrasi Hermes dengan AI Memory",
+        "current_goal": "Integrasi Hermes dengan Standalone Mindhub",
         "status": "in_progress",
-        "progress": "Ujian handshake lulus, menambah project state",
-        "decisions": ["Gunakan existing gateway", "Tolak Mnemosyne"],
+        "progress": "Pelayan SQLite beroperasi, menyegerak snapshot projek",
+        "decisions": ["Gunakan Standalone SQLite Mindhub"],
         "blockers": [],
-        "next_action": "Jalankan migrasi database di node01",
+        "next_action": "Sambungkan cloud agents",
     },
 )
 
@@ -96,45 +180,9 @@ current = client.get_project_state(project_id=1)
 print(f"Goal semasa (Seq {current['sequence']}): {current['current_goal']}")
 ```
 
-### 2. Mendaftarkan Tools pada Gateway (FastMCP / FastAPI)
+### 2. GitHub Wiki to MCP Memory Sync
 
-```python
-from mcp.server.fastmcp import FastMCP
-from mindhub.gateway_project_state import register_project_state_tools
-from mindhub.mysql_project_state import MySQLProjectStatePersistence
-
-mcp = FastMCP("ai-memory")
-persistence = MySQLProjectStatePersistence.from_env()
-
-# Daftar ketiga-tiga project state tools
-register_project_state_tools(mcp, persistence)
-```
-
-### 3. Menjalankan Migrasi Database
-
-```python
-from mindhub.migrations import apply_migrations
-import mysql.connector
-
-conn = mysql.connector.connect(
-    host="127.0.0.1",
-    port=3306,
-    user="ai_memory_user",
-    password="...",
-    database="ai_memory",
-)
-apply_migrations(conn)
-conn.close()
-```
-
-Atau melalui baris arahan (menggunakan pembolehubah persekitaran `MYSQL_*`):
-```bash
-python -m mindhub.migrations
-```
-
-### 4. GitHub Wiki to MCP Memory Sync
-
-Muat naik dokumentasi Wiki ke memori gateway:
+Muat naik dokumentasi Wiki ke memori Mindhub:
 
 ```bash
 # Simulasi (dry-run)
@@ -153,23 +201,9 @@ Lihat maklumat lanjut dalam [docs/wiki-sync.md](docs/wiki-sync.md).
 
 ## 🧪 Ujian (Testing)
 
-Semua unit tests, mock HTTP transport tests, dan concurrency tests boleh dijalankan tanpa sebarang database luaran:
+Semua unit tests (termasuk SQLite in-memory, mock HTTP transport, dan logik memori) boleh dijalankan tanpa sebarang database luar:
 
 ```bash
-python -m unittest discover tests
-```
-
-### Ujian Integrasi MySQL (Disposable)
-Untuk mengelakkan sebarang gangguan terhadap data sebenar, ujian integrasi MySQL dilindungi oleh pagar keselamatan (*safety guardrail*):
-
-```bash
-set MINDHUB_TEST_MYSQL_DISPOSABLE=1
-set MINDHUB_TEST_MYSQL_DATABASE=mindhub_test
-set MINDHUB_TEST_MYSQL_HOST=127.0.0.1
-set MINDHUB_TEST_MYSQL_PORT=33307
-set MINDHUB_TEST_MYSQL_USER=test_user
-set MINDHUB_TEST_MYSQL_PASSWORD=test_pass
-
 python -m unittest discover tests
 ```
 
@@ -188,5 +222,5 @@ python -m unittest discover tests
 
 ## 🔒 Had & Keselamatan
 
-- **Tiada rahsia dalam Git**: Fail `.env`, API key, dan password database tidak sekali-kali disimpan di dalam kod sumber.
-- **Pengasingan Homelab**: Ujian automatik tidak akan menyambung ke host pengeluaran `node01` secara lalai.
+- **Tiada rahsia dalam Git**: Fail `.env`, API key, dan pangkalan data SQLite (`*.db`) diabaikan oleh `.gitignore`.
+- **Pengasingan Homelab**: Pelayan mandiri tidak mengganggu perkhidmatan legacy sedia ada pada port 8087 tanpa arahan pengguna.
