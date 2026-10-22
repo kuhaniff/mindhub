@@ -32,6 +32,8 @@ from .project_state import (
     get_project_state_history,
     update_project_state,
 )
+from .sqlite_memory import SQLiteMemoryPersistence
+from .sqlite_project_state import SQLiteProjectStatePersistence
 from .wiki_sync import (
     WikiPage,
     WikiSync,
@@ -54,6 +56,8 @@ __all__ = [
     "ProjectStatePersistenceError",
     "ProjectStateSnapshot",
     "ProjectStateStore",
+    "SQLiteMemoryPersistence",
+    "SQLiteProjectStatePersistence",
     "StreamableHTTPMCPClient",
     "WikiPage",
     "WikiSync",

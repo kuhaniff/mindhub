@@ -22,6 +22,9 @@ gateway_work/
 *.dump
 *.bak
 *.backup
+*.db
+*.sqlite
+*.sqlite3
 
 # Python bytecode and caches
 __pycache__/

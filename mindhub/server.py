@@ -49,16 +49,16 @@ _state_backend: ProjectStatePersistence | None = None
 def _get_memory_backend() -> MemoryPersistence:
     global _memory_backend
     if _memory_backend is None:
-        from .mysql_memory import MySQLMemoryPersistence
-        _memory_backend = MySQLMemoryPersistence.from_env()
+        from .sqlite_memory import SQLiteMemoryPersistence
+        _memory_backend = SQLiteMemoryPersistence.from_env()
     return _memory_backend
 
 
 def _get_state_backend() -> ProjectStatePersistence:
     global _state_backend
     if _state_backend is None:
-        from .mysql_project_state import MySQLProjectStatePersistence
-        _state_backend = MySQLProjectStatePersistence.from_env()
+        from .sqlite_project_state import SQLiteProjectStatePersistence
+        _state_backend = SQLiteProjectStatePersistence.from_env()
     return _state_backend
 
 
