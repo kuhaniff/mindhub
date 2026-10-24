@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, Request, Response
@@ -185,6 +186,16 @@ class _APIKeyMiddleware(BaseHTTPMiddleware):
 # ---------------------------------------------------------------------------
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage background lifespan tasks such as MCP session manager."""
+    async with AsyncExitStack() as stack:
+        session_mgr = getattr(mcp, "session_manager", None)
+        if session_mgr is not None and hasattr(session_mgr, "run"):
+            await stack.enter_async_context(session_mgr.run())
+        yield
+
+
 def create_app(
     memory_backend: MemoryPersistence | None = None,
     state_backend: ProjectStatePersistence | None = None,
@@ -207,7 +218,7 @@ def create_app(
     if state_backend is not None:
         _state_backend = state_backend
 
-    app = FastAPI(title="Mindhub MCP Server", version="0.1.0")
+    app = FastAPI(title="Mindhub MCP Server", version="0.1.0", lifespan=lifespan)
 
     # Health endpoint (excluded from auth)
     @app.get("/health")
@@ -217,19 +228,26 @@ def create_app(
     # Auth middleware
     app.add_middleware(_APIKeyMiddleware)
 
-    # Mount MCP ASGI app
+    # Obtain MCP streamable HTTP ASGI app
     try:
         mcp_asgi = mcp.streamable_http_app()
+        session_mgr = getattr(mcp, "session_manager", None)
+        if session_mgr is not None:
+            security_settings = getattr(session_mgr, "security_settings", None)
+            if security_settings is not None:
+                # Allow access across LAN/Tailscale (100.*), proxies, and cloud tunnels
+                security_settings.enable_dns_rebinding_protection = False
+        # streamable_http_app already routes /mcp internally, so mount at root
+        app.mount("/", mcp_asgi)
     except AttributeError:
         try:
             mcp_asgi = mcp.get_asgi_app()
+            app.mount("/mcp", mcp_asgi)
         except AttributeError as exc:  # pragma: no cover
             raise RuntimeError(
                 "FastMCP / MCPServer does not expose a compatible ASGI app method. "
                 "Ensure a supported mcp package version is installed."
             ) from exc
-
-    app.mount("/mcp", mcp_asgi)
 
     return app
 

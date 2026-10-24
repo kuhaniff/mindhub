@@ -22,7 +22,12 @@ class TestServerHealthAndAuth(unittest.TestCase):
         self.mem = InMemoryMemoryPersistence()
         self.state = InMemoryProjectStatePersistence()
         self.app = create_app(memory_backend=self.mem, state_backend=self.state)
-        self.client = TestClient(self.app)
+        # Entering TestClient as context manager triggers the FastAPI lifespan
+        self._client_cm = TestClient(self.app)
+        self.client = self._client_cm.__enter__()
+
+    def tearDown(self) -> None:
+        self._client_cm.__exit__(None, None, None)
 
     def test_health_endpoint_returns_200(self) -> None:
         response = self.client.get("/health")
@@ -49,8 +54,23 @@ class TestServerHealthAndAuth(unittest.TestCase):
 
     def test_valid_api_key_passes_auth(self) -> None:
         with patch.dict(os.environ, {"MINDHUB_API_KEYS": "valid-key-1,valid-key-2"}):
-            response = self.client.get("/mcp", headers={"X-API-Key": "valid-key-1"})
-            self.assertNotEqual(response.status_code, 401)
+            response = self.client.post(
+                "/mcp",
+                headers={"X-API-Key": "valid-key-1"},
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2024-11-05",
+                        "capabilities": {},
+                        "clientInfo": {"name": "test", "version": "1.0"},
+                    },
+                },
+            )
+            # Should successfully initialize (HTTP 200) and establish session
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("mcp-session-id", response.headers)
 
 
 if __name__ == "__main__":
