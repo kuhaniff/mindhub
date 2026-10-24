@@ -27,6 +27,8 @@ class MockMCPHandler(BaseHTTPRequestHandler):
     force_gateway_error = False
     gateway_error_message = "gateway unavailable"
     project_state = InMemoryProjectStatePersistence()
+    session_id_to_issue = None
+    require_session_id = False
 
     def do_POST(self):  # noqa: N802
         body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
@@ -40,8 +42,18 @@ class MockMCPHandler(BaseHTTPRequestHandler):
             self.wfile.write(b'{"detail":"Unauthorized"}')
             return
 
+        if type(self).require_session_id and request.get("method") != "initialize":
+            if not self.headers.get("MCP-Session-ID"):
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"Bad Request: Missing session ID"}}')
+                return
+
         if request.get("method") == "notifications/initialized":
             self.send_response(202)
+            if type(self).session_id_to_issue:
+                self.send_header("MCP-Session-ID", type(self).session_id_to_issue)
             self.end_headers()
             return
 
@@ -147,6 +159,8 @@ class MockMCPHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(encoded)))
+        if type(self).session_id_to_issue:
+            self.send_header("MCP-Session-ID", type(self).session_id_to_issue)
         self.end_headers()
         self.wfile.write(encoded)
 
@@ -175,6 +189,8 @@ class MCPAdapterTests(unittest.TestCase):
         MockMCPHandler.force_gateway_error = False
         MockMCPHandler.gateway_error_message = "gateway unavailable"
         MockMCPHandler.project_state = InMemoryProjectStatePersistence()
+        MockMCPHandler.session_id_to_issue = None
+        MockMCPHandler.require_session_id = False
 
     def client(self, key="local-test-key"):
         return StreamableHTTPMCPClient(self.endpoint, api_key=key)
@@ -373,6 +389,26 @@ class MCPAdapterTests(unittest.TestCase):
         payload = client.call_tool_payload("remember", {"content": "test memory", "memory_type": "fact", "source": None})
         self.assertEqual(payload, {"id": 7, "status": "saved"})
 
+    def test_session_id_lifecycle(self):
+        MockMCPHandler.session_id_to_issue = "session-xyz-123"
+        MockMCPHandler.require_session_id = True
+
+        client = self.client()
+        self.assertIsNone(client.session_id)
+
+        initialized = client.initialize()
+        self.assertEqual(initialized["serverInfo"]["name"], "ai-memory")
+        self.assertEqual(client.session_id, "session-xyz-123")
+
+        # Verify notifications/initialized sent MCP-Session-ID
+        init_notification_headers = {k.lower(): v for k, v in MockMCPHandler.requests[1][1].items()}
+        self.assertEqual(init_notification_headers.get("mcp-session-id"), "session-xyz-123")
+
+        # Verify subsequent requests send MCP-Session-ID
+        tools = client.list_tools()
+        self.assertTrue(len(tools) > 0)
+        tools_headers = {k.lower(): v for k, v in MockMCPHandler.requests[2][1].items()}
+        self.assertEqual(tools_headers.get("mcp-session-id"), "session-xyz-123")
 
 class _FakeResponse:
     def __init__(self, body, content_type="application/json"):

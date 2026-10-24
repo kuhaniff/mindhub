@@ -23,8 +23,12 @@ gateway_work/
 *.bak
 *.backup
 *.db
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
+.migration-work/
+.migration-backups/
 
 # Python bytecode and caches
 __pycache__/

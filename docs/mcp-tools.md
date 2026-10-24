@@ -1,8 +1,14 @@
 # MCP Tools
 
-Source audit mengenal pasti MCP server bernama `ai-memory` yang di-mount pada `/mcp` menggunakan streamable HTTP.
+Source semasa mendedahkan lima tool pada endpoint `/mcp` menggunakan Streamable HTTP:
 
-Dokumen ini menerangkan deklarasi tools yang kelihatan dalam source. Ia belum disahkan melalui MCP client atau service runtime.
+- `search_memory`
+- `remember`
+- `get_project_state`
+- `update_project_state`
+- `get_project_state_history`
+
+Dokumen ini menerangkan kontrak source untuk tool memory. Status runtime dan batas integrasi ada dalam [MCP Integration Contract](mcp-integration.md).
 
 ## `search_memory`
 
@@ -34,26 +40,21 @@ Input:
 | `content` | string | — | tidak boleh kosong, maksimum 60000 aksara |
 | `memory_type` | string | `fact` | di-trim dan dipotong kepada maksimum 50 aksara oleh source |
 | `source` | string atau null | `null` | optional |
+| `project_id` | integer atau null | `null` | optional |
 
-Respons source berbentuk:
+Respons source berbentuk objek yang mengandungi rekod memory yang disimpan; ID dijana oleh database.
 
-```json
-{
-  "id": "database-generated value",
-  "status": "saved"
-}
-```
+## Project state tools
+
+- `get_project_state(project_id)` mendapatkan snapshot semasa untuk project.
+- `update_project_state(project_id, state)` mencipta snapshot baharu.
+- `get_project_state_history(project_id)` mendapatkan sejarah snapshot mengikut turutan.
 
 ## Transport dan keselamatan
 
-- MCP menggunakan streamable HTTP.
-- JSON response dan stateless HTTP dinyatakan dalam source.
-- Path `/mcp` dilindungi oleh middleware `X-API-Key`.
+- MCP menggunakan Streamable HTTP pada `/mcp`.
+- Endpoint `/health` dikecualikan daripada auth.
+- Path lain memerlukan `X-API-Key`, dengan key dibaca daripada `MINDHUB_API_KEYS`.
 - Nilai API key tidak disimpan dalam dokumentasi ini.
 
-## Belum disahkan
-
-- MCP protocol version yang digunakan ketika runtime.
-- Tool metadata yang dihantar kepada client sebenar.
-- Error envelope sebenar daripada transport.
-- Authorization behavior selain middleware yang kelihatan dalam source.
+Butiran session live, konfigurasi Hermes yang belum wired, dan had adapter didokumenkan dalam [MCP Integration Contract](mcp-integration.md).

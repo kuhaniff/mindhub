@@ -87,8 +87,16 @@ class StreamableHTTPMCPClient:
         self.client_info = client_info or MCPClientInfo()
         self._next_id = 1
         self._initialized = False
+        self._session_id: str | None = None
+
+    @property
+    def session_id(self) -> str | None:
+        """The active MCP session ID, if established."""
+        return self._session_id
 
     def initialize(self) -> dict:
+        self._session_id = None
+        self._initialized = False
         result = self._request(
             "initialize",
             {
@@ -214,10 +222,18 @@ class StreamableHTTPMCPClient:
         }
         if self._initialized:
             headers["MCP-Protocol-Version"] = self.protocol_version
+        if self._session_id:
+            headers["MCP-Session-ID"] = self._session_id
         request = Request(self.endpoint, data=body, headers=headers, method="POST")
 
         try:
             with urlopen(request, timeout=self.timeout) as response:
+                session_id = (
+                    response.headers.get("MCP-Session-ID")
+                    or response.headers.get("mcp-session-id")
+                )
+                if session_id:
+                    self._session_id = session_id
                 if notification:
                     return None
                 raw = response.read()
