@@ -369,6 +369,23 @@ class MCPAdapterTests(unittest.TestCase):
         parsed = extract_tool_payload(mcp_result)
         self.assertEqual(parsed, {"status": "ok", "count": 42})
 
+        # Structured content (FastMCP list result)
+        structured_result = {
+            "structuredContent": {"result": [{"seq": 1}, {"seq": 2}]},
+            "isError": False,
+        }
+        self.assertEqual(extract_tool_payload(structured_result), [{"seq": 1}, {"seq": 2}])
+
+        # Multiple content blocks fallback to list
+        multi_content = {
+            "content": [
+                {"type": "text", "text": json.dumps({"seq": 1})},
+                {"type": "text", "text": json.dumps({"seq": 2})},
+            ],
+            "isError": False,
+        }
+        self.assertEqual(extract_tool_payload(multi_content), [{"seq": 1}, {"seq": 2}])
+
     def test_extract_tool_payload_returns_text_when_not_json(self):
         mcp_result = {
             "content": [{"type": "text", "text": "simple string response"}],

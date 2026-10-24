@@ -27,19 +27,20 @@ SECRET_PATTERNS = [
 DEFAULT_DENYLIST = ("_Sidebar.md", "_Footer.md")
 
 
+def _secret_replacer(match: re.Match) -> str:
+    """Replace either the captured secret group or full match with redaction placeholder."""
+    full = match.group(0)
+    if match.lastindex and match.lastindex >= 1:
+        secret_part = match.group(1)
+        return full.replace(secret_part, "[REDACTED_SECRET]")
+    return "[REDACTED_SECRET]"
+
+
 def redact_sensitive_content(content: str) -> str:
     """Detect and redact potential secrets from markdown content."""
     sanitized = content
     for pattern in SECRET_PATTERNS:
-        def _replace(match: re.Match) -> str:
-            # If pattern captured a specific secret group, replace that group
-            full = match.group(0)
-            if match.lastindex and match.lastindex >= 1:
-                secret_part = match.group(1)
-                return full.replace(secret_part, "[REDACTED_SECRET]")
-            return "[REDACTED_SECRET]"
-
-        sanitized = pattern.sub(_replace, sanitized)
+        sanitized = pattern.sub(_secret_replacer, sanitized)
     return sanitized
 
 

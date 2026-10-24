@@ -113,6 +113,9 @@ class TestInMemoryFiltering(unittest.TestCase):
         results = self.persistence.search("expired")
         self.assertEqual(len(results), 0)
 
+    def test_no_dead_store_attribute(self) -> None:
+        self.assertFalse(hasattr(self.persistence, "_store"))
+
 
 if __name__ == "__main__":
     unittest.main()

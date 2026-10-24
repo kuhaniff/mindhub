@@ -81,8 +81,6 @@ class InMemoryMemoryPersistence:
     """Thread-safe in-memory backend for testing."""
 
     def __init__(self) -> None:
-        self._store: list[tuple[int, str, str, MemoryRecord, datetime]] = []
-        # (id, status, expires_at_str, record, created_at)
         self._records: list[dict] = []
         self._counter: int = 0
         self._lock = RLock()

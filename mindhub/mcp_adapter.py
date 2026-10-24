@@ -37,25 +37,44 @@ class MCPClientInfo:
 def extract_tool_payload(result: dict) -> object:
     """Extract and parse the inner payload from an MCP CallToolResult or direct dict.
 
-    If the result contains a standard MCP 'content' list, concatenate text blocks
-    and attempt to parse as JSON (falling back to the raw string if not JSON).
+    If the result contains structuredContent with a 'result' key, return it.
+    If the result contains a standard MCP 'content' list:
+      - If there are multiple text blocks, parse each as JSON if possible and return the list.
+      - If there is a single text block, parse as JSON (falling back to raw string).
     If the result is already a dict without a 'content' key, return it as-is.
     """
     if not isinstance(result, dict):
         return result
+    if not result.get("isError"):
+        structured = result.get("structuredContent")
+        if isinstance(structured, dict) and "result" in structured:
+            return structured["result"]
     if "content" in result and isinstance(result["content"], list):
-        text_parts = [
+        text_items = [
             item.get("text", "")
             for item in result["content"]
             if isinstance(item, dict) and item.get("type") == "text"
         ]
-        combined = "".join(text_parts).strip()
-        if not combined:
+        if not text_items:
+            return None
+        if len(text_items) > 1:
+            parsed_items = []
+            for text in text_items:
+                trimmed = text.strip()
+                if not trimmed:
+                    continue
+                try:
+                    parsed_items.append(json.loads(trimmed))
+                except json.JSONDecodeError:
+                    parsed_items.append(trimmed)
+            return parsed_items
+        single = text_items[0].strip()
+        if not single:
             return None
         try:
-            return json.loads(combined)
+            return json.loads(single)
         except json.JSONDecodeError:
-            return combined
+            return single
     return result
 
 

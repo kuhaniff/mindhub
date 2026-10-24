@@ -122,6 +122,19 @@ class TestMySQLMemorySearch(unittest.TestCase):
         params = execute_call[0][1]
         self.assertIn(7, params)
 
+    def test_search_escapes_wildcards_in_params(self) -> None:
+        conn = MagicMock()
+        cursor = MagicMock()
+        conn.cursor.return_value = cursor
+        cursor.fetchall.return_value = []
+
+        persistence = _make_persistence(conn)
+        persistence.search("100%_discount\\deal")
+
+        execute_call = cursor.execute.call_args_list[0]
+        params = execute_call[0][1]
+        self.assertEqual(params[0], "100\\%\\_discount\\\\deal")
+
     def test_search_raises_persistence_error_on_db_failure(self) -> None:
         conn = MagicMock()
         cursor = MagicMock()

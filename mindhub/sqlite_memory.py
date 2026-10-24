@@ -107,6 +107,7 @@ class SQLiteMemoryPersistence:
     def search(self, query: str, *, limit: int = 10) -> tuple[Memory, ...]:
         """Search active non-expired memories by content substring."""
         now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+        safe_query = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         with self._lock:
             try:
                 rows = self._conn.execute(
@@ -114,10 +115,10 @@ class SQLiteMemoryPersistence:
                     "explicitness, created_at FROM memories "
                     "WHERE status = 'active' "
                     "  AND (expires_at IS NULL OR expires_at > ?) "
-                    "  AND content LIKE ? "
+                    "  AND content LIKE ? ESCAPE '\\' "
                     "ORDER BY updated_at DESC "
                     "LIMIT ?",
-                    (now_iso, f"%{query}%", limit),
+                    (now_iso, f"%{safe_query}%", limit),
                 ).fetchall()
                 return tuple(_memory_from_row(row) for row in rows)
             except Exception as exc:

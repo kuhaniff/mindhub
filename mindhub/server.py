@@ -157,15 +157,27 @@ def get_project_state_history(project_id: int) -> list[dict]:
 class _APIKeyMiddleware(BaseHTTPMiddleware):
     """Reject requests missing a valid X-API-Key header (except /health)."""
 
+    def __init__(self, app: Any, **kwargs: Any) -> None:
+        super().__init__(app, **kwargs)
+        raw = os.environ.get("MINDHUB_API_KEYS", "")
+        self._raw_keys: str = raw
+        self._valid_keys: frozenset[str] = frozenset(k.strip() for k in raw.split(",") if k.strip())
+
+    def _get_valid_keys(self) -> frozenset[str]:
+        raw = os.environ.get("MINDHUB_API_KEYS", "")
+        if raw != self._raw_keys:
+            self._raw_keys = raw
+            self._valid_keys = frozenset(k.strip() for k in raw.split(",") if k.strip())
+        return self._valid_keys
+
     async def dispatch(self, request: Request, call_next: Any) -> Response:
         if request.url.path == "/health":
             return await call_next(request)
 
-        raw = os.environ.get("MINDHUB_API_KEYS", "")
-        valid_keys = {k.strip() for k in raw.split(",") if k.strip()}
+        valid_keys = self._get_valid_keys()
         if not valid_keys:
             return Response(
-                content='{"detail":"service not configured"}',
+                content='{"detail":"server not configured — set MINDHUB_API_KEYS"}',
                 status_code=401,
                 media_type="application/json",
             )

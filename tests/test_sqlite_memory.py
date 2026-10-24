@@ -118,6 +118,21 @@ class TestSQLiteMemorySearch(unittest.TestCase):
         results = p.search("anything")
         self.assertIsInstance(results, tuple)
 
+    def test_search_escapes_like_wildcards(self) -> None:
+        p = _make_persistence()
+        p.store(MemoryRecord(content="100% discount deal"))
+        p.store(MemoryRecord(content="1000 items in stock"))
+        p.store(MemoryRecord(content="variable_name in code"))
+        p.store(MemoryRecord(content="variableXname in code"))
+
+        percent_results = p.search("100%")
+        self.assertEqual(len(percent_results), 1)
+        self.assertEqual(percent_results[0].content, "100% discount deal")
+
+        underscore_results = p.search("variable_name")
+        self.assertEqual(len(underscore_results), 1)
+        self.assertEqual(underscore_results[0].content, "variable_name in code")
+
 
 class TestSQLiteMemoryFromEnv(unittest.TestCase):
     def test_from_env_uses_default_path(self) -> None:

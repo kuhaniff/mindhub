@@ -105,6 +105,7 @@ class MySQLMemoryPersistence:
         """Search active non-expired memories by content substring."""
         connection = self._connection_factory()
         cursor = None
+        safe_query = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         try:
             cursor = connection.cursor()
             cursor.execute(
@@ -115,7 +116,7 @@ class MySQLMemoryPersistence:
                 "  AND content LIKE CONCAT('%', %s, '%') "
                 "ORDER BY updated_at DESC "
                 "LIMIT %s",
-                (query, limit),
+                (safe_query, limit),
             )
             rows = cursor.fetchall()
             return tuple(_memory_from_row(row) for row in rows)
