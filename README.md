@@ -141,8 +141,18 @@ mcp_servers:
   mindhub:
     url: "http://127.0.0.1:8088/mcp"
     headers:
-      X-API-Key: "hermes-secret-key"
+      X-API-Key: "herme...key"
 ```
+
+> Ini ialah contoh konfigurasi sasaran. Setakat verifikasi **2026-10-24**, konfigurasi Hermes aktif masih menunjuk `ai-memory` pada `127.0.0.1:8087`; ia belum wired ke Mindhub `:8088`.
+
+---
+
+## ✅ Status Verifikasi Integrasi
+
+Verifikasi read-only pada **2026-10-24** mengesahkan `mindhub.service` aktif di `node01:8088`, `/health` HTTP 200, auth diperlukan, Streamable HTTP `initialize` berjaya dengan session, tepat 5 tools tersedia, dan `get_project_state(1)` mengembalikan sequence 1. Ujian repo: `123 passed, 3 skipped`.
+
+Butiran kontrak source, boundary legacy, konfigurasi Hermes yang belum wired, dan had adapter ada di [MCP Integration Contract](docs/mcp-integration.md).
 
 ---
 
@@ -217,6 +227,7 @@ python -m unittest discover tests
 - [Database Schema](docs/database-schema.md)
 - [MCP Integration Contract](docs/mcp-integration.md)
 - [Test Plan](docs/test-plan.md)
+- [Offline ai-memory JSONL Import](docs/migration-import.md)
 
 ---
 

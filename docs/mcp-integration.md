@@ -1,105 +1,72 @@
 # MCP Integration Contract
 
-## Status
+## Status ringkas
 
-Ini ialah perancangan integrasi untuk Hermes berdasarkan dokumentasi source audit. Ia belum diuji dengan MCP client sebenar dan belum menjadi implementation contract yang muktamad.
+Dokumen ini membezakan empat perkara: kontrak semasa yang kelihatan dalam source repo, verifikasi live bertarikh **2026-10-24**, konfigurasi Hermes yang **belum disambungkan** ke Mindhub, dan had adapter yang masih diketahui. Ia tidak mendakwa bahawa konfigurasi Hermes atau adapter telah dipatch.
 
-## Fakta yang disahkan melalui source audit
+## Kontrak semasa berdasarkan source repo
 
-- MCP server dinamakan `ai-memory`.
-- MCP application di-mount pada path `/mcp`.
-- Transport dinyatakan sebagai Streamable HTTP.
-- `json_response=True` dan `stateless_http=True` dinyatakan dalam source.
-- Middleware HTTP melindungi `/mcp` dan subpath `/mcp/...` dengan header `X-API-Key`.
-- Compose yang diaudit memetakan host `127.0.0.1:8087` kepada port container `8000`.
-- Tool yang dideklarasikan ialah `search_memory` dan `remember`.
+- Pelayan dinamakan `mindhub` dan disediakan sebagai standalone FastAPI + MCP server.
+- MCP dihidangkan pada path `/mcp` menggunakan **Streamable HTTP**.
+- Default entry point menjalankan server pada `0.0.0.0:8088`; `/health` disediakan tanpa auth.
+- Semua path selain `/health` memerlukan header `X-API-Key`, dengan nilai dibaca daripada `MINDHUB_API_KEYS`.
+- Lima tool yang didaftarkan ialah:
+  - `search_memory`
+  - `remember`
+  - `get_project_state`
+  - `update_project_state`
+  - `get_project_state_history`
+- `get_project_state`, `update_project_state`, dan `get_project_state_history` menggunakan `project_id`; operasi update menerima objek `state`.
+- Adapter client menggunakan header `X-API-Key`, menjalankan MCP `initialize`, menyimpan `MCP-Session-ID` apabila diterima, dan menyokong response JSON serta data frame JSON yang biasa dalam SSE.
 
-## Cara Hermes dijangka connect
+Kontrak source di atas menerangkan apa yang repo semasa tetapkan; ia bukan bukti bahawa instance live atau konfigurasi client tertentu telah menggunakannya.
 
-Urutan konseptual yang dicadangkan:
+## Verifikasi live — 2026-10-24
 
-1. Hermes menggunakan MCP client yang menyokong Streamable HTTP.
-2. Client dikonfigurasi dengan endpoint gateway pada URL yang mengandungi `/mcp`.
-3. Client menghantar `X-API-Key` melalui konfigurasi secret yang tidak disimpan dalam repo.
-4. Client melakukan handshake MCP.
-5. Client meminta tool discovery.
-6. Hermes mengesahkan kewujudan `search_memory` dan `remember` sebelum memanggilnya.
-7. Hermes memanggil tool menggunakan input minimum yang didokumenkan.
+Verifikasi read-only terhadap `node01` mengesahkan perkara berikut:
 
-Urutan ini ialah **andaian integrasi** sehingga diuji dengan client dan server sebenar.
+- `mindhub.service` aktif dan mendengar pada `0.0.0.0:8088`.
+- `GET /health` mengembalikan HTTP `200`.
+- Request MCP tanpa auth ditolak dengan HTTP `401`.
+- `initialize` yang diautentikasi mengembalikan HTTP `200` dan session ID.
+- Tool surface live tepat lima tool: `search_memory`, `remember`, `get_project_state`, `update_project_state`, dan `get_project_state_history`.
+- Panggilan diautentikasi `get_project_state(1)` mengembalikan `sequence = 1`.
+- Ujian repo yang dijalankan semasa verifikasi: `123 passed, 3 skipped`.
 
-## Perkara yang mesti disahkan
+Verifikasi ini mengesahkan service, auth, transport, tool discovery, dan satu bacaan project state. Ia tidak mengesahkan deployment provenance, persistence selepas restart, atau laluan end-to-end melalui konfigurasi Hermes.
 
-### Endpoint dan routing
+## Konfigurasi Hermes: belum wired
 
-- URL sebenar yang perlu digunakan oleh Hermes.
-- Sama ada endpoint tepat ialah `/mcp`, `/mcp/` atau path lain hasil routing transport.
-- Sama ada `127.0.0.1:8087` hanya sesuai untuk client pada mesin yang sama.
-- Routing jika Hermes dan gateway berjalan pada host berbeza.
+Konfigurasi Hermes semasa masih mengarahkan server legacy **`ai-memory`** pada `127.0.0.1:8087`; ia belum ditukar kepada Mindhub pada port `8088`. Maka, contoh endpoint berikut ialah bentuk sasaran sahaja dan bukan dakwaan konfigurasi aktif:
 
-### Streamable HTTP
+```yaml
+mcp_servers:
+  mindhub:
+    url: "http://127.0.0.1:8088/mcp"
+    headers:
+      X-API-Key: "<secret-dari-secret-store>"
+```
 
-- Format request pertama yang dijangka oleh server.
-- Format handshake dan response.
-- Keperluan header `Accept`, `Content-Type` atau header MCP lain.
-- Sokongan connection/session behavior walaupun source menetapkan stateless HTTP.
-- Cara client mengendalikan response JSON dan error daripada transport.
+Jangan commit API key sebenar atau menyalin secret ke dokumentasi, log, atau konfigurasi tracked.
 
-### Authentication
+## Had adapter yang diketahui
 
-- Header `X-API-Key` disahkan pada handshake, setiap request, atau kedua-duanya.
-- Behavior jika header tiada atau nilainya salah.
-- Cara Hermes menyimpan dan menyuntik secret tanpa memasukkannya ke source, log atau Git.
-- Sama ada authentication middleware menghasilkan HTTP `401` yang sama untuk semua request MCP.
+`mindhub/mcp_adapter.py` masih mempunyai gap berikut berdasarkan semakan verifikasi:
 
-### Handshake dan tool discovery
+- Tiada pemulihan session apabila request menerima HTTP `404`.
+- Tiada penghantaran `DELETE` untuk menutup session.
+- `structuredContent` tidak digunakan ketika mengekstrak hasil tool.
+- `isError` tidak dipromosikan sebagai keadaan error adapter.
 
-- Protocol version yang digunakan ketika runtime.
-- Nama method handshake dan discovery yang sebenar.
-- Schema input yang dihantar oleh server kepada client.
-- Metadata, description dan annotations tool.
-- Format response discovery.
-- Format error apabila tool tidak wujud atau input tidak sah.
+Had ini tidak mengubah fakta bahawa initialize dan tool calls asas telah diverifikasi live. Sebarang pembetulan adapter memerlukan perubahan kod dan ujian berasingan.
 
-Semua perkara di atas kekal **pending verification**. Jangan reka response atau error envelope sebelum ujian sebenar.
+## Boundary sejarah
 
-## Kontrak minimum berdasarkan dokumentasi sedia ada
+Dokumentasi audit lama merujuk service bernama `ai-memory`, host `127.0.0.1:8087`, mod stateless HTTP, dan dua tool (`search_memory` serta `remember`). Itu ialah konteks legacy yang menerangkan asal konfigurasi lama; ia **bukan** fakta semasa tentang standalone Mindhub yang diverifikasi di `:8088`.
 
-### `search_memory`
+Boundary integrasi yang kekal:
 
-Input minimum:
-
-| Field | Jenis | Syarat |
-|---|---|---|
-| `query` | string | tidak kosong selepas trim |
-| `limit` | integer | optional, default `10`, julat `1` hingga `50` |
-
-Behavior source yang diketahui: carian dibuat pada memory aktif, memory yang belum luput, dan disusun mengikut `updated_at DESC`.
-
-Output minimum yang didokumenkan: senarai row memory. Field yang kelihatan dalam hasil source ialah `id`, `project_id`, `memory_type`, `content`, `source`, `explicitness` dan `created_at`.
-
-Bentuk envelope MCP dan bentuk khusus hasil kosong **belum disahkan**.
-
-### `remember`
-
-Input minimum:
-
-| Field | Jenis | Syarat |
-|---|---|---|
-| `content` | string | tidak kosong, maksimum 60000 aksara |
-| `memory_type` | string | optional, default `fact`, maksimum 50 aksara |
-| `source` | string atau null | optional |
-
-Output minimum yang kelihatan dalam source ialah hasil yang mengandungi ID memory dan status simpanan. Nilai sebenar ID dijana database.
-
-Bentuk envelope MCP dan error response **belum disahkan**.
-
-## Boundary integrasi
-
-MCP adapter Hermes tidak boleh:
-
-- membaca `.env` secara terus ke dalam repo,
-- menyalin API key ke konfigurasi tracked,
-- menganggap URL deployment sudah diketahui,
-- menggunakan database production untuk ujian awal,
-- menganggap HTTP API REST dan MCP mempunyai error envelope yang sama.
+- Jangan membaca `.env` terus ke repo atau menyalin API key ke konfigurasi tracked.
+- Jangan anggap URL deployment atau routing antara host sudah diketahui tanpa verifikasi.
+- Jangan gunakan database production untuk ujian awal.
+- Jangan anggap error envelope HTTP biasa dan MCP adalah sama.
