@@ -228,6 +228,15 @@ python -m unittest discover tests
 - [MCP Integration Contract](docs/mcp-integration.md)
 - [Test Plan](docs/test-plan.md)
 - [Offline ai-memory JSONL Import](docs/migration-import.md)
+- [OAuth 2.1 Facade (Claude & Gemini Connectors)](docs/oauth-facade.md)
+
+---
+
+## 🔐 OAuth 2.1 Facade (Claude & Gemini Connectors)
+
+Mindhub includes an OAuth 2.1 facade (`mindhub_oauth`) enabling external AI clients (Claude web/mobile, Google Gemini) to connect securely to Mindhub's MCP server via RFC 6749, RFC 7636 (mandatory PKCE S256), RFC 8707 (Resource Indicators), and Dynamic Client Registration (RFC 7591). The facade translates external Bearer tokens into internal `X-API-Key` authentication. Existing tools (Hermes Agent, Antigravity) continue connecting directly to Mindhub untouched.
+
+See [docs/oauth-facade.md](docs/oauth-facade.md) for architecture, configuration, endpoints, and deployment details.
 
 ---
 
