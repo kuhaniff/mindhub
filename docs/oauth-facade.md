@@ -215,7 +215,7 @@ Conforms to OAuth 2.1 specification and documented client behavior, verified by 
 - Claude expects an HTTP `302 Found` redirect back to `https://claude.ai/...` upon consent.
 
 ### Google Gemini Custom Connector
-- Gemini sends a long `state` parameter (often exceeding 512 characters, up to 4096 characters) encoding client and session context (e.g. `user_bound_custom-mcp-<id>-<host>`).
+- Gemini sends a `state` parameter longer than 512 characters (observed in testing; its exact length and content are not documented, so the facade accepts up to 4096).
 - Gemini registers with up to 6 redirect URIs under `oauth-redirect.googleusercontent.com` and `oauth-redirect-sandbox.googleusercontent.com` with paths `/r/*` or `/a/*`.
 - Notice on test host redirect URIs: Gemini may register redirect URIs using host `oauth-redirect-test.googleusercontent.com` (such as `https://oauth-redirect-test.googleusercontent.com/r/user_bound_custom-mcp-<id>-<host>`), which are not allowlisted by default and must be pinned exactly via `FACADE_EXTRA_REDIRECT_URIS` (format: comma-separated exact URIs).
 - Gemini sends `token_endpoint_auth_method="client_secret_post"` during DCR. The facade sets this to `"none"` and issues no `client_secret` (public client model).
