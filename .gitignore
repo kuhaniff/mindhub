@@ -58,3 +58,7 @@ dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+# OAuth facade local database and task spec
+oauth.db*
+OAUTH_TASK.md

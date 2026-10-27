@@ -1,0 +1,48 @@
+[Unit]
+Description=Mindhub OAuth 2.1 Facade (Claude & Gemini MCP Gateway)
+# Documentation: docs/oauth-facade.md
+After=network.target mindhub.service
+Wants=mindhub.service
+
+[Service]
+Type=simple
+User=hermes
+Group=hermes
+UMask=0077
+
+# WorkingDirectory and ExecStart paths must be changed to the real repository location
+# (currently /home/hermes/projects/mindhub on node01).
+# Note: ProtectHome=read-only is compatible with running from a venv under /home,
+# because the process only reads code/libraries; state writes go to StateDirectory.
+WorkingDirectory=/home/hermes/projects/mindhub
+
+# Environment file path (MUST be chmod 0600, owned by hermes:hermes, never committed)
+EnvironmentFile=/etc/mindhub-oauth/env
+
+# ExecStart using the virtualenv python; runs single worker bound to loopback 127.0.0.1:8089
+ExecStart=/home/hermes/projects/mindhub/.venv/bin/python -m mindhub_oauth serve
+
+Restart=on-failure
+RestartSec=5s
+
+# StateDirectory automatically manages /var/lib/mindhub-oauth with mode 0700 and ownership hermes:hermes
+StateDirectory=mindhub-oauth
+StateDirectoryMode=0700
+# Keep ReadWritePaths consistent with the state directory (/var/lib/mindhub-oauth)
+ReadWritePaths=/var/lib/mindhub-oauth
+
+# Systemd security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

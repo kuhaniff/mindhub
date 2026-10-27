@@ -25,6 +25,8 @@ dependencies = [
     "mcp>=1.30.0",
     "fastapi>=0.100",
     "uvicorn>=0.20",
+    "starlette>=0.28.0",
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
@@ -37,6 +39,7 @@ dev = [
 
 [project.scripts]
 mindhub-server = "mindhub.__main__:main"
+mindhub-oauth = "mindhub_oauth.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
